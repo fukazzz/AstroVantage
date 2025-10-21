@@ -1,0 +1,110 @@
+name: AstroVantage
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CLANG_PATH: ${{ github.workspace }}/clang
+      GCC64_PATH: ${{ github.workspace }}/gcc64
+      GCC32_PATH: ${{ github.workspace }}/gcc32
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Prepare timezone
+        run: sudo ln -sf /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
+
+      - name: Set build time
+        id: set_time
+        run: |
+          echo "time=$(TZ=Asia/Jakarta date '+%d%m%y')" >> $GITHUB_OUTPUT
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends bc cpio flex bison git python3-pip tar perl wget curl lz4 libssl-dev build-essential device-tree-compiler libncurses-dev libelf-dev zlib1g-dev
+
+      - name: Restore Toolchains Cache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ${{ env.CLANG_PATH }}
+            ${{ env.GCC64_PATH }}
+            ${{ env.GCC32_PATH }}
+          key: toolchains-${{ github.ref_name }}
+          restore-keys: |
+            toolchains-${{ github.ref_name }}
+
+      - name: Clone Toolchains
+        run: |
+          mkdir -p "${{ env.CLANG_PATH }}"
+          if [ ! -f "${{ env.CLANG_PATH }}/bin/clang" ]; then
+            curl -fL -o clang.tar.gz https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/531a564ba5426707dee226eccb19f104a7af5a5f/clang-r563880c.tar.gz
+            tar -C "${{ env.CLANG_PATH }}" -xzf clang.tar.gz
+          fi
+          if [ ! -d "${{ env.GCC64_PATH }}/bin" ]; then
+            git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 "${{ env.GCC64_PATH }}"
+          fi
+          if [ ! -d "${{ env.GCC32_PATH }}/bin" ]; then
+            git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 "${{ env.GCC32_PATH }}"
+          fi
+
+      - name: Save Toolchains Cache
+        uses: actions/cache/save@v3
+        continue-on-error: true
+        with:
+          path: |
+            ${{ env.CLANG_PATH }}
+            ${{ env.GCC64_PATH }}
+            ${{ env.GCC32_PATH }}
+          key: toolchains-${{ github.ref_name }}
+
+      - name: Clone SukiSU-Ultra
+        run: |
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+
+      - name: Build Kernel
+        shell: bash
+        run: |
+          set -e
+          export ARCH=arm64
+          export PATH="${{ env.CLANG_PATH }}/bin:${{ env.GCC64_PATH }}/bin:${{ env.GCC32_PATH }}/bin:$PATH"
+          export KBUILD_BUILD_USER=Craftron
+          export KBUILD_BUILD_HOST=ChipZest
+          export KBUILD_COMPILER_STRING="$(${{ env.CLANG_PATH }}/bin/clang --version | head -n 1)"
+          make ARCH=arm64 mrproper
+          make ARCH=arm64 clean
+          make O=out ARCH=arm64 sweet_defconfig
+          make -j$(nproc --all) O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 \
+            CC=${{ env.CLANG_PATH }}/bin/clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=${{ env.GCC64_PATH }}/bin/aarch64-linux-android- \
+            CROSS_COMPILE_ARM32=${{ env.GCC32_PATH }}/bin/arm-eabi- \
+            V=1 2>&1 | tee build.log
+          mv out/.config out/sweet_defconfig.txt
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ steps.set_time.outputs.time }}
+          path: build.log
+
+      - name: Upload configs
+        uses: actions/upload-artifact@v4
+        with:
+          name: configs-${{ steps.set_time.outputs.time }}
+          path: out/sweet_defconfig.txt
+
+      - name: Clone Anykernel3
+        run: |
+          git clone --depth=1 https://github.com/fukazzz/AnyKernel3 -b main AnyKernel3
+          cp out/arch/arm64/boot/{Image.gz,dtb.img,dtbo.img} AnyKernel3/
+
+      - name: Upload Flashable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstroVantage-SukiSU
+          path: AnyKernel3/*
