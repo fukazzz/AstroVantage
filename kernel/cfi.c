@@ -13,6 +13,7 @@
 #include <linux/ratelimit.h>
 #include <linux/rcupdate.h>
 #include <asm/cacheflush.h>
+#include <linux/set_memory.h>
 #include <asm/set_memory.h>
 
 /* Compiler-defined handler names */
