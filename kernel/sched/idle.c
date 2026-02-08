@@ -243,6 +243,9 @@ static void do_idle(void)
 	__current_set_polling();
 	tick_nohz_idle_enter();
 
+	/* POC Selector: mark CPU as idle using smp_processor_id() */
+	set_cpu_idle_state(smp_processor_id(), 1);
+
 	while (!need_resched()) {
 		check_pgt_cache();
 		rmb();
@@ -271,6 +274,9 @@ static void do_idle(void)
 		}
 		arch_cpu_idle_exit();
 	}
+
+	/* POC Selector: mark CPU as busy using smp_processor_id() */
+	set_cpu_idle_state(smp_processor_id(), 0);
 
 	/*
 	 * Since we fell out of the loop above, we know TIF_NEED_RESCHED must
