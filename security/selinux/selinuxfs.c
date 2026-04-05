@@ -530,11 +530,20 @@ static int sel_make_policy_nodes(struct selinux_fs_info *fsi)
 
 static ssize_t sel_write_load(struct file *file, const char __user *buf,
 			      size_t count, loff_t *ppos)
-
 {
 	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
 	ssize_t length;
 	void *data = NULL;
+
+	/* no partial writes */
+	if (*ppos)
+		return -EINVAL;
+	/* no empty policies */
+	if (!count)
+		return -EINVAL;
+	/* limit policy size (e.g., 64MB) to prevent OOM */
+	if (count > 64 * 1024 * 1024)
+		return -EFBIG;
 
 	mutex_lock(&fsi->mutex);
 
@@ -544,23 +553,15 @@ static ssize_t sel_write_load(struct file *file, const char __user *buf,
 	if (length)
 		goto out;
 
-	/* No partial writes. */
-	length = -EINVAL;
-	if (*ppos != 0)
-		goto out;
-
-	length = -EFBIG;
-	if (count > 64 * 1024 * 1024)
-		goto out;
-
-	length = -ENOMEM;
 	data = vmalloc(count);
-	if (!data)
+	if (!data) {
+		length = -ENOMEM;
 		goto out;
-
-	length = -EFAULT;
-	if (copy_from_user(data, buf, count) != 0)
+	}
+	if (copy_from_user(data, buf, count) != 0) {
+		length = -EFAULT;
 		goto out;
+	}
 
 	length = security_load_policy(fsi->state, data, count);
 	if (length) {
@@ -579,6 +580,7 @@ out1:
 		"policy loaded auid=%u ses=%u",
 		from_kuid(&init_user_ns, audit_get_loginuid(current)),
 		audit_get_sessionid(current));
+
 out:
 	mutex_unlock(&fsi->mutex);
 	vfree(data);
