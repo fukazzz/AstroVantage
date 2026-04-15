@@ -779,6 +779,11 @@ KBUILD_CFLAGS	+= -mllvm -polly-run-dce
 endif
 endif
 
+ifdef CONFIG_CLANG_ML_INLINER
+KBUILD_CFLAGS	+= -mllvm -enable-ml-inliner=release \
+		   -mllvm -regalloc-enable-advisor=release
+endif
+
 ifdef CONFIG_LTO_CLANG
 KBUILD_CFLAG	+= -fwhole-program-vtables
 endif

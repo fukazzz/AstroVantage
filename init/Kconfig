@@ -135,6 +135,19 @@ config POLLY_CLANG
 
         https://polly.llvm.org
 
+config CLANG_ML_INLINER
+    bool "Use Clang ML-guided inliner and register allocator"
+    depends on CC_IS_CLANG
+    depends on !COMPILE_TEST
+    help
+      This option enables Clang's machine-learning-guided inliner and
+      register allocation advisor. Both use offline-trained MLGO models
+      to make better decisions than the default heuristics, at no extra
+      runtime cost. This requires a Clang toolchain compiled with the
+      MLGO release models embedded (LLVM built with
+      LLVM_INLINER_MODEL_PATH and LLVM_REGALLOC_MODEL_PATH pointing to
+      the release model archives).
+
 config HAVE_KERNEL_GZIP
 	bool
 
