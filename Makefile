@@ -760,14 +760,22 @@ ifeq ($(cc-name),clang)
 KBUILD_CFLAGS += -mcpu=cortex-a76+crc+crypto -mtune=cortex-a76 -march=armv8.2-a+crc+crypto+lse+rdm+rcpc+dotprod -O3 -funroll-loops
 KBUILD_AFLAGS += -mcpu=cortex-a76+crc+crypto -mtune=cortex-a76 -march=armv8.2-a+crc+crypto+lse+rdm+rcpc+dotprod -O3 -funroll-loops
 endif
+endif
 
-ifdef CONFIG_LLVM_POLLY
-KBUILD_CFLAGS	+= -mllvm -polly \
-		   -mllvm -polly-run-dce \
-		   -mllvm -polly-run-inliner \
+ifdef CONFIG_POLLY_CLANG
+KBUILD_CFLAGS	+= -fplugin=LLVMPolly.so \
+		   -mllvm -polly \
 		   -mllvm -polly-ast-use-context \
-		   -mllvm -polly-vectorizer=stripmine \
-		   -mllvm -polly-invariant-load-hoisting
+		   -mllvm -polly-invariant-load-hoisting \
+		   -mllvm -polly-loopfusion-greedy \
+		   -mllvm -polly-run-inliner \
+		   -mllvm -polly-vectorizer=stripmine
+# Polly may optimise loops with dead paths beyound what the linker
+# can understand. This may negate the effect of the linker's DCE
+# so we tell Polly to perfom proven DCE on the loops it optimises
+# in order to preserve the overall effect of the linker's DCE.
+ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
+KBUILD_CFLAGS	+= -mllvm -polly-run-dce
 endif
 endif
 
