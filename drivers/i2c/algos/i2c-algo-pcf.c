@@ -109,9 +109,12 @@ static int wait_for_bb(struct i2c_algo_pcf_data *adap)
 
 	status = get_pcf(adap, 1);
 
+	int delay = 10;
 	while (!(status & I2C_PCF_BB) && --timeout) {
-		udelay(100); /* wait for 100 us */
-		status = get_pcf(adap, 1);
+    udelay(delay);
+    if (delay < 100)
+        delay = min(delay * 2, 100);
+    status = get_pcf(adap, 1);
 	}
 
 	if (timeout == 0) {
