@@ -91,9 +91,14 @@ static unsigned short au1xac97c_ac97_read(struct snd_ac97 *ac97,
 	do {
 		mutex_lock(&ctx->lock);
 
-		tmo = 6;
-		while ((RD(ctx, AC97_STATUS) & STAT_CP) && --tmo)
-			udelay(21);	/* wait an ac97 frame time */
+		int delay = 5;
+		tmo = 10;
+		while ((RD(ctx, AC97_STATUS) & STAT_CP) && --tmo) {
+			udelay(delay);
+		if (delay < 20)
+			delay *= 2;
+		}
+
 		if (!tmo) {
 			pr_debug("ac97rd timeout #1\n");
 			goto next;
