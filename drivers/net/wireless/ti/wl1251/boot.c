@@ -38,6 +38,7 @@ int wl1251_boot_soft_reset(struct wl1251 *wl)
 {
 	unsigned long timeout;
 	u32 boot_data;
+	int delay_us = 10;  // Start dengan 10µs, adaptive backoff
 
 	/* perform soft reset */
 	wl1251_reg_write32(wl, ACX_REG_SLV_SOFT_RESET, ACX_SLV_SOFT_RESET_BIT);
@@ -51,13 +52,13 @@ int wl1251_boot_soft_reset(struct wl1251 *wl)
 			break;
 
 		if (time_after(jiffies, timeout)) {
-			/* 1.2 check pWhalBus->uSelfClearTime if the
-			 * timeout was reached */
 			wl1251_error("soft reset timeout");
 			return -1;
 		}
 
-		udelay(SOFT_RESET_STALL_TIME);
+		udelay(delay_us);
+		if (delay_us < 100)
+			delay_us = min(delay_us * 2, 100);
 	}
 
 	/* disable Rx/Tx */
@@ -223,6 +224,9 @@ int wl1251_boot_run_firmware(struct wl1251 *wl)
 {
 	int loop, ret;
 	u32 chip_id, acx_intr;
+	int attempt = 0;
+	const int MAX_ATTEMPTS = 1000;
+	const int INIT_DELAY_US = 100;
 
 	wl1251_boot_set_ecpu_ctrl(wl, ECPU_CONTROL_HALT);
 
@@ -235,10 +239,8 @@ int wl1251_boot_run_firmware(struct wl1251 *wl)
 		return -EIO;
 	}
 
-	/* wait for init to complete */
 	loop = 0;
-	while (loop++ < INIT_LOOP) {
-		udelay(INIT_LOOP_DELAY);
+	while (attempt++ < MAX_ATTEMPTS) {
 		acx_intr = wl1251_reg_read32(wl, ACX_REG_INTERRUPT_NO_CLEAR);
 
 		if (acx_intr == 0xffffffff) {
@@ -246,15 +248,18 @@ int wl1251_boot_run_firmware(struct wl1251 *wl)
 				     "init indication");
 			return -EIO;
 		}
-		/* check that ACX_INTR_INIT_COMPLETE is enabled */
 		else if (acx_intr & WL1251_ACX_INTR_INIT_COMPLETE) {
 			wl1251_reg_write32(wl, ACX_REG_INTERRUPT_ACK,
 					   WL1251_ACX_INTR_INIT_COMPLETE);
+			wl1251_debug(DEBUG_BOOT, "hardware ready after %d attempts", attempt);
 			break;
 		}
+
+		if (attempt % 10 == 0)
+			udelay(INIT_DELAY_US);
 	}
 
-	if (loop > INIT_LOOP) {
+	if (attempt >= MAX_ATTEMPTS) {
 		wl1251_error("timeout waiting for the hardware to "
 			     "complete initialization");
 		return -EIO;
