@@ -211,6 +211,8 @@ static int gs_download_image(struct fpgaimage *fimage, enum wbus bus_bytes)
 {
 	u8 *bitdata;
 	int size, i, cnt;
+	unsigned long timeout;
+	int retry_delay = 10;  /* Start 10µs */
 
 	cnt = 0;
 	bitdata = (u8 *)fimage->fpgadata;
@@ -233,17 +235,28 @@ static int gs_download_image(struct fpgaimage *fimage, enum wbus bus_bytes)
 
 	/* Configuration reset */
 	xl_program_b(0);
-	msleep(20);
+	mdelay(10);
 	xl_program_b(1);
 
-	/* Wait for Device Initialization */
-	while (xl_get_init_b() == 0)
-		;
+	timeout = jiffies + msecs_to_jiffies(100);  /* Max 100ms */
+	while (!xl_get_init_b()) {
+		if (time_after(jiffies, timeout)) {
+			pr_err("FPGA init timeout after 100ms\n");
+			return -ETIMEDOUT;
+		}
+		udelay(retry_delay);
+		if (retry_delay < 1000)
+			retry_delay = min(retry_delay * 2, 1000);  /* Backoff */
+	}
 
 	pr_info("device init done\n");
 
-	for (i = 0; i < size; i += bus_bytes)
+	for (i = 0; i < size; i += bus_bytes) {
 		xl_shift_bytes_out(bus_bytes, bitdata + i);
+		/* Prevent tight busy-wait */
+		if ((i % (bus_bytes * 100)) == 0)
+			cpu_relax();
+	}
 
 	pr_info("program done\n");
 
@@ -253,16 +266,22 @@ static int gs_download_image(struct fpgaimage *fimage, enum wbus bus_bytes)
 		return -EIO;
 	}
 
-	while (xl_get_done_b() == 0) {
-		if (cnt++ > MAX_WAIT_DONE) {
-			pr_err("init_B %d\n", xl_get_init_b());
-			break;
+	cnt = 0;
+	timeout = jiffies + msecs_to_jiffies(500);  /* Max 500ms */
+	retry_delay = 10;
+	
+	while (!xl_get_done_b()) {
+		if (time_after(jiffies, timeout)) {
+			pr_err("FPGA done timeout after 500ms\n");
+			return -ETIMEDOUT;
 		}
-	}
-
-	if (cnt > MAX_WAIT_DONE) {
-		pr_err("fpga download fail\n");
-		return -EIO;
+		if (cnt++ > MAX_WAIT_DONE) {
+			pr_err("max retries exceeded\n");
+			return -EIO;
+		}
+		udelay(retry_delay);
+		if (retry_delay < 1000)
+			retry_delay = min(retry_delay * 2, 1000);
 	}
 
 	pr_info("download fpgaimage\n");
