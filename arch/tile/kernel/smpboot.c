@@ -214,24 +214,47 @@ void online_secondary(void)
 
 int __cpu_up(unsigned int cpu, struct task_struct *tidle)
 {
-	/* Wait 5s total for all CPUs for them to come online */
-	static int timeout;
-	for (; !cpumask_test_cpu(cpu, &cpu_started); timeout++) {
-		if (timeout >= 50000) {
-			pr_info("skipping unresponsive cpu%d\n", cpu);
+	unsigned long timeout;
+	int delay_us = 10;  /* Start minimal */
+	int attempts = 0;
+
+	timeout = jiffies + msecs_to_jiffies(1000);  /* Max 1 second */
+	
+	while (!cpumask_test_cpu(cpu, &cpu_started)) {
+		if (time_after(jiffies, timeout)) {
+			pr_warn("CPU%d boot timeout after 1s\n", cpu);
 			local_irq_enable();
-			return -EIO;
+			return -EBUSY;
 		}
-		udelay(100);
+		
+		attempts++;
+
+		udelay(delay_us);
+		if (delay_us < 200)
+			delay_us = min(delay_us * 2 + 10, 200);
+		
+		/* Print debug setiap 100 attempts */
+		if (attempts % 100 == 0)
+			pr_debug("CPU%d boot progress: %d attempts\n", cpu, attempts);
 	}
 
+	pr_info("CPU%d started after %d attempts\n", cpu, attempts);
+	
 	local_irq_enable();
 	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;
 
 	/* Unleash the CPU! */
 	send_IPI_single(cpu, MSG_TAG_START_CPU);
-	while (!cpumask_test_cpu(cpu, cpu_online_mask))
-		cpu_relax();
+
+	timeout = jiffies + msecs_to_jiffies(100);
+	while (!cpumask_test_cpu(cpu, cpu_online_mask)) {
+		if (time_after(jiffies, timeout)) {
+			pr_warn("CPU%d online timeout\n", cpu);
+			return -EBUSY;
+		}
+		cpu_relax();  /* Lighter than udelay */
+	}
+	
 	return 0;
 }
 
