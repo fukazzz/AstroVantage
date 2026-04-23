@@ -207,6 +207,7 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, u64 time)
 	struct rq *rq = cpu_rq(cpu);
 	unsigned long max_cap, rt;
 	s64 delta;
+	struct sched_walt_cpu_load walt_load;
 
 	max_cap = capacity_orig_of(cpu);
 
@@ -217,7 +218,7 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, u64 time)
 	rt = div64_u64(rq->rt_avg, sched_avg_period() + delta);
 	rt = (rt * max_cap) >> SCHED_CAPACITY_SHIFT;
 
-	struct sched_walt_cpu_load walt_load = {0};
+	memset(&walt_load, 0, sizeof(walt_load));
 	*util = boosted_cpu_util(cpu, &walt_load);
 	if (likely(use_pelt()))
 		*util = min((*util + rt), max_cap);
