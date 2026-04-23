@@ -1360,11 +1360,14 @@ static void msm_dirconn_irq_eoi(struct irq_data *d)
 static int msm_dirconn_irq_set_affinity(struct irq_data *d,
 		const struct cpumask *maskval, bool force)
 {
+	struct irq_desc *desc;
+	struct irq_data *parent_data;
+
 	if (IS_ENABLED(CONFIG_IRQ_SBALANCE))
 		return 0;
 
-	struct irq_desc *desc = irq_data_to_desc(d);
-	struct irq_data *parent_data = irq_get_irq_data(desc->parent_irq);
+	desc = irq_data_to_desc(d);
+	parent_data = irq_get_irq_data(desc->parent_irq);
 
 	if (!parent_data)
 		return 0;
