@@ -1115,13 +1115,15 @@ static void gpio_muxed_to_pdc(struct irq_domain *pdc_domain, struct irq_data *d)
 {
 	int i, j;
 	unsigned int mux;
-	struct irq_desc *desc = irq_data_to_desc(d);
-	struct irq_data *parent_data = irq_get_irq_data(desc->parent_irq);
+	struct irq_desc *desc;
+	struct irq_data *parent_data;
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
 	unsigned int gpio = d->hwirq;
 	struct msm_pinctrl *pctrl;
 	unsigned int irq;
-
+    desc = irq_data_to_desc(d);
+    parent_data = irq_get_irq_data(desc->parent_irq);
+	
 	if (!gc || !parent_data)
 		return;
 
