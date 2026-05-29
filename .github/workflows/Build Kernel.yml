@@ -62,7 +62,7 @@ jobs:
         if: steps.cache-toolchain.outputs.cache-hit != 'true'
         run: |
           mkdir -p "${CLANG_PATH}" "${GCC64_PATH}" "${GCC32_PATH}"
-          aria2c -x16 -s16 -k1M -o clang.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/1a128578c6d273b8f7bdf027c4340d9874a6861d/clang-r596125.tar.gz"
+          aria2c -x16 -s16 -k1M -o clang.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/f23683acc642adb9c39fab310eba8a6b2cfe7ccd/clang-r547379.tar.gz"
           tar -C "${CLANG_PATH}" -xzf clang.tar.gz && rm -f clang.tar.gz
           git clone --depth=1 --single-branch https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9.git -b android12L-release "${GCC64_PATH}"
           git clone --depth=1 --single-branch https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9.git -b android12L-release "${GCC32_PATH}"
@@ -86,7 +86,7 @@ jobs:
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             LLVM=1 \
             LLVM_IAS=1 \
-            V=0 2>&1 | tee build.log
+            V=1 2>&1 | tee build.log
           ccache -s
           cp $OC_OUT/.config $OC_OUT/sweet_defconfig.txt
 
