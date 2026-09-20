@@ -47,7 +47,7 @@ jobs:
             ${{ env.CLANG_PATH }}
             ${{ env.GCC64_PATH }}
             ${{ env.GCC32_PATH }}
-          key: gcc-clang-r596125
+          key: gcc-clang-r547379
 
       - name: Cache Ccache
         uses: actions/cache@v4
