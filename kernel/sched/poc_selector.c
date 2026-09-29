@@ -146,19 +146,17 @@ static bool is_idle_core_poc(int cpu, struct sched_domain_shared *sd_share)
 	int base = sd_share->poc_cpu_base;
 	int nr_words = sd_share->poc_nr_words;
 	int sibling;
-	int bit, word, pos;
-	u64 cpus;
 
 	/* FIX: Gunakan topology_sibling_cpumask untuk 4.14 */
 	for_each_cpu(sibling, topology_sibling_cpumask(cpu)) {
-		bit  = sibling - base;
-        word = bit >> 6;
-        pos  = bit & 63;
+		int bit  = sibling - base;
+		int word = bit >> 6;
+		int pos  = bit & 63;
 
 		if ((unsigned int)word >= nr_words)
 			return false;
 
-		cpus = (u64)atomic64_read(&sd_share->poc_idle_cpus[word]);
+		u64 cpus = (u64)atomic64_read(&sd_share->poc_idle_cpus[word]);
 
 		if (!(cpus & (1ULL << pos)))
 			return false;
@@ -169,16 +167,15 @@ static bool is_idle_core_poc(int cpu, struct sched_domain_shared *sd_share)
 void __set_cpu_idle_state(int cpu, int state)
 {
 	struct sched_domain_shared *sd_share;
-	int bit, word, pos;
 
 	rcu_read_lock();
 	sd_share = rcu_dereference(per_cpu(sd_llc_shared, cpu));
 	if (!sd_share)
 		goto out_unlock;
 
-	bit  = cpu - sd_share->poc_cpu_base;
-    word = bit >> 6;
-    pos  = bit & 63;
+	int bit  = cpu - sd_share->poc_cpu_base;
+	int word = bit >> 6;
+	int pos  = bit & 63;
 
 	if ((unsigned int)word >= sd_share->poc_nr_words)
 		goto out_unlock;
