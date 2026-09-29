@@ -221,12 +221,20 @@ static int binder_update_page_range(struct binder_alloc *alloc, int allocate,
 	if (mm) {
 		down_read(&mm->mmap_sem);
 		vma = alloc->vma;
+		if (!vma) {
+			vma = find_vma(mm, (unsigned long)start);
+		}
 	}
 
 	if (!vma && need_mm) {
-		pr_err("%d: binder_alloc_buf failed to map pages in userspace, no vma\n",
-			alloc->pid);
-		goto err_no_vma;
+		if (mm) {
+			vma = find_vma(mm, (unsigned long)start);
+		}
+		if (!vma) {
+			pr_err("%d: binder_alloc_buf failed to map pages in userspace, no vma\n",
+				alloc->pid);
+			goto err_no_vma;
+		}
 	}
 
 	for (page_addr = start; page_addr < end; page_addr += PAGE_SIZE) {
