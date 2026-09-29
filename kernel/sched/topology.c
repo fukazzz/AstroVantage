@@ -1074,9 +1074,9 @@ static void init_sched_groups_energy(int cpu, struct sched_domain *sd,
 	}
 
 	if (sd->child && !sd->child->groups->sge) {
-		pr_err("BUG: EAS setup borken for CPU%d\n", cpu);
+		pr_debug("EAS setup placeholder for CPU%d\n", cpu);
 #ifdef CONFIG_SCHED_DEBUG
-		pr_err("     energy data on %s but not on %s domain\n",
+		pr_debug("     energy data on %s but not on %s domain\n",
 			sd->name, sd->child->name);
 #endif
 		return;
